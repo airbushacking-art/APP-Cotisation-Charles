@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Association des Ressortissants de Fadiouth Résidant à Mbour et ses Environs</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#eef2f7;padding:20px;}
+h1{text-align:center;color:#1f3a5f;margin-bottom:20px;}
+h2{background:#1f3a5f;color:white;padding:10px;border-radius:8px;}
+.card{background:white;padding:15px;margin-bottom:15px;border-radius:10px;}
+input,select,button{padding:10px;margin:5px;border-radius:6px;}
+button{background:#1f3a5f;color:white;cursor:pointer;}
+button:hover{background:#2e5c8a;}
+table{width:100%;border-collapse:collapse;}
+th,td{border:1px solid #ddd;padding:10px;text-align:center;}
+th{background:#16a085;color:white;}
+</style>
+</head>
+
+<body>
+
+<h1>📊 Association des Ressortissants de Fadiouth Résidant à Mbour et ses Environs </h1>
+
+<h2>👥 Membres</h2>
+
+<div class="card">
+<input id="nom" placeholder="Nom">
+<input id="telephone" placeholder="Téléphone">
+<button onclick="ajouterMembre()">Ajouter membre</button>
+</div>
+
+<div class="card">
+<select id="membreSelect"></select>
+<input id="montant" type="number" placeholder="Montant">
+<input id="mois" type="month">
+<button onclick="ajouterCotisation()">Ajouter cotisation</button>
+</div>
+
+<div class="card">
+<input id="searchInput" placeholder="Rechercher membre">
+<button onclick="rechercher()">🔍</button>
+<button onclick="resetRecherche()">♻️</button>
+</div>
+
+<div class="card">
+<button onclick="historiqueGlobal()">📜 Historique</button>
+<button onclick="pdfHistoriqueGlobal()">📄 PDF global</button>
+</div>
+
+<div class="card">
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Nom</th>
+<th>Tel</th>
+<th>Total Cotisations</th>
+<th>Carte membre</th>
+<th>Total Global</th>
+<th>PDF</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+
+<h2>🛏️ MARIA TERESA SHOP</h2>
+
+<div class="card">
+<input id="nomClient" placeholder="Nom">
+<input id="telClient" placeholder="Téléphone">
+<input id="cniClient" placeholder="CNI">
+<input id="adresseClient" placeholder="Adresse">
+<input id="typeMatelas" placeholder="Matelas">
+<input id="prixMatelas" type="number" placeholder="Prix">
+<input id="avance" type="number" placeholder="Avance">
+<button onclick="ajouterClient()">Ajouter client</button>
+</div>
+
+<div class="card">
+<table>
+<thead>
+<tr>
+<th>Nom</th>
+<th>Tel</th>
+<th>CNI</th>
+<th>Adresse</th>
+<th>Matelas</th>
+<th>Prix</th>
+<th>Avance</th>
+<th>Reste</th>
+<th>PDF</th>
+</tr>
+</thead>
+<tbody id="tableClients"></tbody>
+</table>
+</div>
+
+<script>
+
+const CARTE_MEMBER = 2000;
+
+const nomsMois={
+"01":"Janvier","02":"Février","03":"Mars","04":"Avril",
+"05":"Mai","06":"Juin","07":"Juillet","08":"Août",
+"09":"Septembre","10":"Octobre","11":"Novembre","12":"Décembre"
+};
+
+function formatMois(m){
+let t=m.split("-");
+return nomsMois[t[1]]+" "+t[0];
+}
+
+let membres=JSON.parse(localStorage.getItem("membres"))||[];
+let clients=JSON.parse(localStorage.getItem("clients"))||[];
+let compteurId=JSON.parse(localStorage.getItem("compteurId"))||1;
+
+function save(){
+localStorage.setItem("membres",JSON.stringify(membres));
+localStorage.setItem("clients",JSON.stringify(clients));
+localStorage.setItem("compteurId",compteurId);
+}
+
+function totalCotisations(m){
+return m.cotisations.reduce((s,c)=>s+c.montant,0);
+}
+
+function totalAnnuelMembre(m){
+return totalCotisations(m)+CARTE_MEMBER;
+}
+
+function ajouterMembre(){
+membres.push({
+id:"M-"+compteurId++,
+nom:nom.value,
+tel:telephone.value,
+cotisations:[]
+});
+save();chargerSelect();afficher();
+}
+
+function ajouterCotisation(){
+let m=membres[membreSelect.value];
+let mois=document.getElementById("mois").value;
+let montant=parseFloat(document.getElementById("montant").value);
+
+if(m.cotisations.find(c=>c.mois===mois)) return alert("Déjà payé");
+
+m.cotisations.push({mois,montant});
+save();afficher();
+}
+
+function afficher(){
+tbody.innerHTML="";
+membres.forEach((m,i)=>{
+tbody.innerHTML+=`
+<tr>
+<td>${m.id}</td>
+<td>${m.nom}</td>
+<td>${m.tel}</td>
+<td>${totalCotisations(m)} CFA</td>
+<td>${CARTE_MEMBER} CFA</td>
+<td>${totalAnnuelMembre(m)} CFA</td>
+<td><button onclick="pdf(${i})">PDF</button></td>
+<td><button onclick="supprimerMembre(${i})">🗑️</button></td>
+</tr>`;
+});
+}
+
+/* ================= PDF MEMBRE ================= */
+function pdf(i){
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+let m=membres[i];
+
+doc.setFontSize(16);
+doc.setFont("helvetica","bold");
+doc.setFillColor(31,58,95);
+doc.rect(0,0,210,18,"F");
+doc.setTextColor(255,255,255);
+doc.text("Association des Ressortissants de Fadiouth Résidant à Mbour et ses Environs",0,12);
+
+doc.setFontSize(12);
+doc.setTextColor(0,0,0);
+
+doc.text("Nom: "+m.nom,10,30);
+doc.text("Tel: "+m.tel,10,40);
+doc.text("Carte membre: "+CARTE_MEMBER+" CFA",10,50);
+
+let y=68;
+
+doc.setFontSize(12);
+doc.setFillColor(22,160,133);
+doc.rect(10,y-6,180,8,"F");
+doc.setTextColor(255,255,255);
+
+doc.text("Mois",20,y);
+doc.text("Montant",120,y);
+
+doc.setTextColor(0,0,0);
+doc.setFontSize(11);
+
+y+=12;
+
+m.cotisations.forEach(c=>{
+doc.text(formatMois(c.mois),20,y);
+doc.text(c.montant+" CFA",120,y);
+y+=10;
+});
+
+doc.setFontSize(12);
+doc.text("Total mois cotisés: "+m.cotisations.length,10,y+10);
+doc.text("TOTAL GENERAL: "+totalAnnuelMembre(m)+" CFA",10,y+20);
+
+doc.save(m.nom+".pdf");
+}
+
+/* ================= PDF GLOBAL ================= */
+function pdfHistoriqueGlobal(){
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+
+doc.setFontSize(16);
+doc.setFont("helvetica","bold");
+doc.setFillColor(31,58,95);
+doc.rect(0,0,210,18,"F");
+doc.setTextColor(255,255,255);
+doc.text("Association des Ressortissants de Fadiouth Résidant à Mbour et ses Environs",0,10);
+
+let y=30;
+let totalGlobal=0;
+
+membres.forEach(m=>{
+let total = totalAnnuelMembre(m);
+totalGlobal+=total;
+
+doc.setFontSize(13);
+doc.setFillColor(22,160,133);
+doc.rect(10,y-6,190,8,"F");
+doc.setTextColor(255,255,255);
+doc.text(m.nom+" ("+m.id+")",12,y);
+
+y+=10;
+doc.setTextColor(0,0,0);
+
+doc.setFontSize(11);
+doc.text("Tel: "+m.tel,12,y); y+=8;
+doc.text("Carte: "+CARTE_MEMBER+" CFA",12,y); y+=8;
+doc.text("Cotisations: "+totalCotisations(m)+" CFA",12,y); y+=8;
+doc.text("Mois: "+m.cotisations.length,12,y); y+=8;
+doc.text("TOTAL: "+total+" CFA",12,y); y+=10;
+
+doc.line(10,y,200,y);
+y+=10;
+
+if(y>270){doc.addPage();y=20;}
+});
+
+doc.setFontSize(14);
+doc.setFillColor(31,58,95);
+doc.rect(10,y,190,10,"F");
+doc.setTextColor(255,255,255);
+doc.text("TOTAL GLOBAL: "+totalGlobal+" CFA",12,y+7);
+
+doc.save("global.pdf");
+}
+
+/* ================= CLIENT PDF ================= */
+function pdfClient(i){
+const {jsPDF}=window.jspdf;
+let doc=new jsPDF();
+let c=clients[i];
+
+doc.setFontSize(16);
+doc.setFont("helvetica","bold");
+doc.setFillColor(22,160,133);
+doc.rect(0,0,210,18,"F");
+doc.setTextColor(255,255,255);
+doc.text(" MARIA TERESA SHOP - FACTURE MATELAS ",10,12);
+
+doc.setFontSize(11);
+doc.setTextColor(0,0,0);
+
+let y=32;
+
+doc.text("Nom",10,y);
+doc.text("Tel",30,y);
+doc.text("CNI",55,y);
+doc.text("Adresse",80,y);
+doc.text("Matelas",120,y);
+doc.text("Prix",150,y);
+doc.text("Avance",170,y);
+doc.text("Reste",190,y);
+
+y+=12;
+
+doc.text(c.nom,10,y);
+doc.text(c.tel,30,y);
+doc.text(c.cni,55,y);
+doc.text(c.adresse,80,y);
+doc.text(c.matelas,120,y);
+doc.text(c.prix+"",150,y);
+doc.text(c.avance+"",170,y);
+doc.text((c.prix-c.avance)+"",190,y);
+
+doc.save(c.nom+".pdf");
+}
+
+function ajouterClient(){
+clients.push({
+nom:nomClient.value,
+tel:telClient.value,
+cni:cniClient.value,
+adresse:adresseClient.value,
+matelas:typeMatelas.value,
+prix:prixMatelas.value,
+avance:avance.value
+});
+save();afficherClients();
+}
+
+function afficherClients(){
+tableClients.innerHTML="";
+clients.forEach((c,i)=>{
+tableClients.innerHTML+=`
+<tr>
+<td>${c.nom}</td>
+<td>${c.tel}</td>
+<td>${c.cni}</td>
+<td>${c.adresse}</td>
+<td>${c.matelas}</td>
+<td>${c.prix}</td>
+<td>${c.avance}</td>
+<td>${c.prix-c.avance}</td>
+<td><button onclick="pdfClient(${i})">PDF</button></td>
+</tr>`;
+});
+}
+
+function chargerSelect(){
+membreSelect.innerHTML="";
+membres.forEach((m,i)=>{
+membreSelect.innerHTML+=`<option value="${i}">${m.nom}</option>`;
+});
+}
+
+function supprimerMembre(i){
+membres.splice(i,1);
+save();afficher();
+}
+
+chargerSelect();
+afficher();
+afficherClients();
+
+</script>
+
+</body>
+</html>
